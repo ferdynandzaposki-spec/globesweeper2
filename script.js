@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
+    const gameViewport = document.getElementById('game-viewport');
     const gameBoard = document.getElementById('game-board');
     const resetButton = document.getElementById('reset-button');
     const mineCounterDisplay = document.getElementById('mine-counter');
@@ -8,14 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageText = document.getElementById('message-text');
 
     // Game Settings
-    const ROWS = 15;
-    const COLS = 20;
-    const MINES_COUNT = 40;
+    const ROWS = 50;
+    const COLS = 50;
+    const MINES_COUNT = 330;
     const HEX_WIDTH = 40;
     const HEX_HEIGHT = 46.19;
 
-    // Game State
+    // Game State & Element Cache
     let grid = [];
+    let hexagonElements = []; // Cache for fisheye effect
     let gameOver = false;
     let minesPlaced = false;
     let revealedCells = 0;
@@ -23,29 +25,34 @@ document.addEventListener('DOMContentLoaded', () => {
     let timerInterval;
     let time = 0;
 
+    // Drag-to-scroll state
+    let isDragging = false;
+    let hasDragged = false;
+    let startX, startY;
+    let scrollLeftStart, scrollTopStart;
+
     function startGame() {
-        // Reset state
         gameOver = false;
         minesPlaced = false;
         revealedCells = 0;
         flagsPlaced = 0;
         time = 0;
 
-        // Reset UI
         clearInterval(timerInterval);
         timerDisplay.textContent = 'Time: 0s';
         mineCounterDisplay.textContent = `Mines: ${MINES_COUNT}`;
         messageOverlay.style.display = 'none';
 
-        // Setup game
         createDataGrid();
         createVisualGrid();
 
-        // Remove old listeners and add new ones
-        gameBoard.removeEventListener('click', handleLeftClick);
-        gameBoard.removeEventListener('contextmenu', handleRightClick);
         gameBoard.addEventListener('click', handleLeftClick);
         gameBoard.addEventListener('contextmenu', handleRightClick);
+
+        // Center the view on start
+        gameViewport.scrollLeft = (gameBoard.scrollWidth - gameViewport.clientWidth) / 2;
+        gameViewport.scrollTop = (gameBoard.scrollHeight - gameViewport.clientHeight) / 2;
+        applyFisheyeEffect(); // Initial effect
     }
 
     function createDataGrid() {
@@ -58,7 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createVisualGrid() {
-        gameBoard.innerHTML = ''; // Clear board for reset, keeps overlay element
+        gameBoard.innerHTML = '';
+        hexagonElements = []; // Clear cache
         const hexHorizontalSpacing = HEX_WIDTH * 0.75;
         const hexVerticalSpacing = HEX_HEIGHT;
 
@@ -75,9 +83,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 hexagon.style.left = `${x}px`;
                 hexagon.style.top = `${y}px`;
                 gameBoard.appendChild(hexagon);
+                hexagonElements.push(hexagon); // Cache the element
             }
         }
-        // Re-append overlay so it's on top
         gameBoard.appendChild(messageOverlay);
 
         const boardWidth = (COLS - 1) * hexHorizontalSpacing + HEX_WIDTH;
@@ -86,85 +94,75 @@ document.addEventListener('DOMContentLoaded', () => {
         gameBoard.style.height = `${boardHeight}px`;
     }
 
-    // Refactored mine placement for better performance and fairness
+    function applyFisheyeEffect() {
+        const viewportRect = gameViewport.getBoundingClientRect();
+        const centerX = gameViewport.scrollLeft + viewportRect.width / 2;
+        const centerY = gameViewport.scrollTop + viewportRect.height / 2;
+
+        const radius = viewportRect.width / 2;
+        const distortion = 0.5; // Adjust this value for more/less distortion
+
+        for (const hexagon of hexagonElements) {
+            const hexRect = hexagon.getBoundingClientRect();
+            const hexX = parseFloat(hexagon.style.left) + hexRect.width / 2;
+            const hexY = parseFloat(hexagon.style.top) + hexRect.height / 2;
+
+            const dx = hexX - centerX;
+            const dy = hexY - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < radius) {
+                const normalizedDist = distance / radius;
+                const scale = (Math.cos(normalizedDist * Math.PI / 2) + 1) / 1.5; // Smooth curve, peaks at center
+
+                // Pull hexagons towards the center
+                const pullFactor = 0.4 * (1 - scale);
+                const tx = -dx * pullFactor;
+                const ty = -dy * pullFactor;
+
+                hexagon.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+                hexagon.style.zIndex = Math.floor(100 * scale);
+            } else {
+                hexagon.style.transform = 'scale(0.4)';
+                hexagon.style.zIndex = 0;
+            }
+        }
+    }
+
+    // --- Event Handlers and Game Logic (largely unchanged) ---
+
     function placeMines(clickedRow, clickedCol) {
         const allCells = [];
-        for (let r = 0; r < ROWS; r++) {
-            for (let c = 0; c < COLS; c++) {
-                if (r !== clickedRow || c !== clickedCol) {
-                    allCells.push({ r, c });
-                }
-            }
-        }
-
-        // Shuffle the cells array
-        for (let i = allCells.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [allCells[i], allCells[j]] = [allCells[j], allCells[i]];
-        }
-
-        // Place mines
-        for (let i = 0; i < MINES_COUNT; i++) {
-            const cell = allCells[i];
-            grid[cell.r][cell.c].isMine = true;
-        }
-
-        // Calculate adjacent mines for all cells
-        for (let r = 0; r < ROWS; r++) {
-            for (let c = 0; c < COLS; c++) {
-                if (!grid[r][c].isMine) {
-                    grid[r][c].adjacentMines = countAdjacentMines(r, c);
-                }
-            }
-        }
+        for (let r = 0; r < ROWS; r++) { for (let c = 0; c < COLS; c++) { if (r !== clickedRow || c !== clickedCol) { allCells.push({ r, c }); } } }
+        for (let i = allCells.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [allCells[i], allCells[j]] = [allCells[j], allCells[i]]; }
+        for (let i = 0; i < MINES_COUNT; i++) { const cell = allCells[i]; grid[cell.r][cell.c].isMine = true; }
+        for (let r = 0; r < ROWS; r++) { for (let c = 0; c < COLS; c++) { if (!grid[r][c].isMine) { grid[r][c].adjacentMines = countAdjacentMines(r, c); } } }
         minesPlaced = true;
     }
 
     function getNeighbors(row, col) {
         const neighbors = [];
         const isOddCol = col % 2 === 1;
-        const neighborOffsets = isOddCol ? [
-            { r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 1, c: -1 }, { r: 0, c: 1 }, { r: 1, c: 1 }
-        ] : [
-            { r: -1, c: 0 }, { r: 1, c: 0 }, { r: -1, c: -1 }, { r: 0, c: -1 }, { r: -1, c: 1 }, { r: 0, c: 1 }
-        ];
-
+        const neighborOffsets = isOddCol ? [{ r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 1, c: -1 }, { r: 0, c: 1 }, { r: 1, c: 1 }] : [{ r: -1, c: 0 }, { r: 1, c: 0 }, { r: -1, c: -1 }, { r: 0, c: -1 }, { r: -1, c: 1 }, { r: 0, c: 1 }];
         for (const offset of neighborOffsets) {
-            let newRow = row + offset.r;
-            let newCol = col + offset.c;
-
-            newRow = (newRow + ROWS) % ROWS;
-            newCol = (newCol + COLS) % COLS;
-
+            let newRow = row + offset.r; let newCol = col + offset.c;
+            newRow = (newRow + ROWS) % ROWS; newCol = (newCol + COLS) % COLS;
             neighbors.push({ row: newRow, col: newCol });
         }
         return neighbors;
     }
 
-    function countAdjacentMines(row, col) {
-        return getNeighbors(row, col).filter(n => grid[n.row][n.col].isMine).length;
-    }
+    function countAdjacentMines(row, col) { return getNeighbors(row, col).filter(n => grid[n.row][n.col].isMine).length; }
 
     function handleLeftClick(e) {
+        if (hasDragged) return;
         const hexagon = e.target.closest('.hexagon');
         if (gameOver || !hexagon) return;
-
-        const row = parseInt(hexagon.dataset.row);
-        const col = parseInt(hexagon.dataset.col);
+        const row = parseInt(hexagon.dataset.row); const col = parseInt(hexagon.dataset.col);
         const cell = grid[row][col];
-
         if (cell.isFlagged || cell.isRevealed) return;
-
-        if (!minesPlaced) {
-            placeMines(row, col);
-            startTimer();
-        }
-
-        if (cell.isMine) {
-            endGame(false);
-            return;
-        }
-
+        if (!minesPlaced) { placeMines(row, col); startTimer(); }
+        if (cell.isMine) { endGame(false); return; }
         revealCell(row, col);
         checkWinCondition();
     }
@@ -173,13 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const hexagon = e.target.closest('.hexagon');
         if (gameOver || !hexagon) return;
-
-        const row = parseInt(hexagon.dataset.row);
-        const col = parseInt(hexagon.dataset.col);
+        const row = parseInt(hexagon.dataset.row); const col = parseInt(hexagon.dataset.col);
         const cell = grid[row][col];
-
         if (cell.isRevealed) return;
-
         cell.isFlagged = !cell.isFlagged;
         hexagon.classList.toggle('flagged');
         flagsPlaced += cell.isFlagged ? 1 : -1;
@@ -189,27 +183,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function revealCell(row, col) {
         const cell = grid[row][col];
         if (!cell || cell.isRevealed || cell.isFlagged) return;
-
         cell.isRevealed = true;
         revealedCells++;
         const hexagon = document.querySelector(`[data-row='${row}'][data-col='${col}']`);
         hexagon.classList.add('revealed');
-
-        if (cell.adjacentMines > 0) {
-            hexagon.textContent = cell.adjacentMines;
-            hexagon.dataset.mines = cell.adjacentMines;
-        } else {
-            getNeighbors(row, col).forEach(n => revealCell(n.row, n.col));
-        }
+        if (cell.adjacentMines > 0) { hexagon.textContent = cell.adjacentMines; hexagon.dataset.mines = cell.adjacentMines; }
+        else { getNeighbors(row, col).forEach(n => revealCell(n.row, n.col)); }
     }
 
     function endGame(isWin) {
         gameOver = true;
         clearInterval(timerInterval);
-
         messageText.textContent = isWin ? 'Congratulations, you won!' : 'Game Over!';
         messageOverlay.style.display = 'flex';
-
         if (!isWin) {
             grid.forEach((row, r) => {
                 row.forEach((cell, c) => {
@@ -222,25 +208,48 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function checkWinCondition() {
-        if (revealedCells === ROWS * COLS - MINES_COUNT) {
-            endGame(true);
-        }
-    }
-
-    function updateMineCounter() {
-        mineCounterDisplay.textContent = `Mines: ${MINES_COUNT - flagsPlaced}`;
-    }
-
+    function checkWinCondition() { if (revealedCells === ROWS * COLS - MINES_COUNT) { endGame(true); } }
+    function updateMineCounter() { mineCounterDisplay.textContent = `Mines: ${MINES_COUNT - flagsPlaced}`; }
     function startTimer() {
         if (timerInterval) clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-            time++;
-            timerDisplay.textContent = `Time: ${time}s`;
-        }, 1000);
+        timerInterval = setInterval(() => { time++; timerDisplay.textContent = `Time: ${time}s`; }, 1000);
     }
 
-    resetButton.addEventListener('click', startGame);
+    // --- Event Listeners ---
+    gameViewport.addEventListener('scroll', () => {
+        requestAnimationFrame(applyFisheyeEffect);
+    });
 
+    gameViewport.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        isDragging = true;
+        hasDragged = false;
+        gameViewport.style.cursor = 'grabbing';
+        startX = e.pageX;
+        startY = e.pageY;
+        scrollLeftStart = gameViewport.scrollLeft;
+        scrollTopStart = gameViewport.scrollTop;
+    });
+
+    gameViewport.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const x = e.pageX;
+        const y = e.pageY;
+        const walkX = x - startX;
+        const walkY = y - startY;
+        if (Math.abs(walkX) > 3 || Math.abs(walkY) > 3) { hasDragged = true; }
+        gameViewport.scrollLeft = scrollLeftStart - walkX;
+        gameViewport.scrollTop = scrollTopStart - walkY;
+    });
+
+    const stopDragging = () => {
+        isDragging = false;
+        gameViewport.style.cursor = 'grab';
+    };
+    gameViewport.addEventListener('mouseup', stopDragging);
+    gameViewport.addEventListener('mouseleave', stopDragging);
+
+    resetButton.addEventListener('click', startGame);
     startGame();
 });

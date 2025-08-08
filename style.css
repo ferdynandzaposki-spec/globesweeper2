@@ -48,13 +48,27 @@ h1 {
     font-weight: bold;
 }
 
+/* Game viewport container */
+#game-viewport {
+    width: 90vw;
+    height: 75vh;
+    max-width: 900px;
+    max-height: 700px;
+    border: 3px solid #555;
+    overflow: hidden; /* Hide scrollbars, scrolling will be handled by JS */
+    position: relative;
+    background: #2c2c2c;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    border-radius: 10px;
+    cursor: grab;
+}
+
 /* Game board container */
 #game-board {
     position: relative;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    border-radius: 10px;
-    background: #ddd;
-    padding: 10px;
+    /* width and height are set by JS */
+    background: #2c2c2c;
+    /* Remove padding to make scrolling exact */
 }
 
 /* Hexagon styles */
