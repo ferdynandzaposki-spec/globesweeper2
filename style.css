@@ -4,14 +4,15 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: #f0f2f5;
-    color: #333;
+    background-color: #1a1a1a; /* Darker background */
+    color: #f0f2f5;
     margin: 0;
     padding-top: 20px;
 }
 
 h1 {
-    color: #1a1a1a;
+    color: #f0f2f5;
+    text-shadow: 0 0 5px rgba(150, 200, 255, 0.5);
 }
 
 /* Game info bar styles */
@@ -22,25 +23,27 @@ h1 {
     width: 90%;
     max-width: 500px;
     margin-bottom: 20px;
-    background: #fff;
+    background: rgba(0, 0, 0, 0.2);
     padding: 10px 20px;
     border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 #reset-button {
     padding: 8px 16px;
     border-radius: 6px;
-    border: none;
-    background-color: #007bff;
+    border: 1px solid #007bff;
+    background-color: rgba(0, 123, 255, 0.5);
     color: white;
     font-size: 16px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s;
 }
 
 #reset-button:hover {
-    background-color: #0056b3;
+    background-color: rgba(0, 123, 255, 0.8);
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.7);
 }
 
 #mine-counter, #timer {
@@ -50,77 +53,97 @@ h1 {
 
 /* Game viewport container */
 #game-viewport {
-    width: 90vw;
-    height: 75vh;
-    max-width: 900px;
+    width: 80vh; /* Use viewport height for responsive sizing */
+    height: 80vh; /* Equal to width to create a square for the circle */
+    max-width: 700px;
     max-height: 700px;
-    border: 3px solid #555;
-    overflow: hidden; /* Hide scrollbars, scrolling will be handled by JS */
+    border: 3px solid rgba(150, 200, 255, 0.3);
+    overflow: hidden;
     position: relative;
-    background: #2c2c2c;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-    border-radius: 10px;
+    background: #000;
+    box-shadow: 0 0 25px rgba(100, 150, 255, 0.4), inset 0 0 20px rgba(0,0,0,0.7);
+    border-radius: 50%; /* This makes the viewport circular */
     cursor: grab;
 }
 
 /* Game board container */
 #game-board {
     position: relative;
-    /* width and height are set by JS */
-    background: #2c2c2c;
-    /* Remove padding to make scrolling exact */
+    background: #000;
 }
 
-/* Hexagon styles */
+/* --- Crystal Hexagon Styles --- */
 .hexagon {
     position: absolute;
     width: 40px;
-    height: 46.19px; /* width * sqrt(3) / 2 * 1.1547 */
-    background-color: #888;
+    height: 46.19px;
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 20px;
-    font-weight: bold;
-    transition: background-color 0.15s ease-in-out;
+
+    /* Crystal effect */
+    background: radial-gradient(circle at 50% 35%, rgba(220, 235, 255, 0.6) 0%, rgba(220, 235, 255, 0) 40%),
+                linear-gradient(145deg, rgba(80, 130, 220, 0.6) 0%, rgba(40, 80, 180, 0.7) 100%);
+    transition: filter 0.3s ease;
+    filter: drop-shadow(0 0 1px rgba(180, 210, 255, 0.7));
 }
 
 .hexagon:hover {
-    background-color: #999;
+    filter: drop-shadow(0 0 4px rgba(200, 225, 255, 1));
+    z-index: 1000 !important; /* Bring to front on hover, important to override JS z-index */
 }
 
 .hexagon.revealed {
-    background-color: #ccc;
+    background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.5) 70%),
+                linear-gradient(145deg, rgba(60, 60, 100, 0.7) 0%, rgba(40, 40, 80, 0.8) 100%);
     cursor: default;
+    filter: drop-shadow(0 0 1px rgba(0,0,0,0.5)) inset 0 0 10px rgba(0,0,0,0.3);
 }
 
-.hexagon.revealed:hover {
-    background-color: #ccc;
+.hex-number {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.7);
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+    opacity: 0.8;
 }
+
+.hexagon[data-mines="1"] .hex-number { color: #8bf; text-shadow: 0 0 4px #8bf; }
+.hexagon[data-mines="2"] .hex-number { color: #8f8; text-shadow: 0 0 4px #8f8; }
+.hexagon[data-mines="3"] .hex-number { color: #f88; text-shadow: 0 0 4px #f88; }
+.hexagon[data-mines="4"] .hex-number { color: #88f; text-shadow: 0 0 4px #88f; }
+.hexagon[data-mines="5"] .hex-number { color: #f8f; text-shadow: 0 0 4px #f8f; }
+.hexagon[data-mines="6"] .hex-number { color: #ff8; text-shadow: 0 0 4px #ff8; }
 
 .hexagon.mine {
-    background-color: #dc3545; /* red */
+    background: radial-gradient(circle, rgba(255, 100, 100, 0.9) 0%, rgba(200, 40, 50, 1) 80%);
+    animation: pulse-red 1.5s infinite ease-in-out;
 }
 
-.hexagon.mine::after {
-    content: '💣';
-    font-size: 20px;
+.hexagon.mine::after { content: '💥'; font-size: 20px; }
+
+@keyframes pulse-red {
+    0% { filter: drop-shadow(0 0 2px #f00); }
+    50% { filter: drop-shadow(0 0 10px #f00); }
+    100% { filter: drop-shadow(0 0 2px #f00); }
 }
 
 .hexagon.flagged::after {
-    content: '🚩';
+    content: '💎';
     font-size: 18px;
+    filter: drop-shadow(0 0 3px #fff);
+    opacity: 0.9;
+    animation: pulse-flag 2s infinite ease-in-out;
 }
 
-/* Number colors */
-.hexagon[data-mines="1"] { color: #0d6efd; } /* blue */
-.hexagon[data-mines="2"] { color: #198754; } /* green */
-.hexagon[data-mines="3"] { color: #dc3545; } /* red */
-.hexagon[data-mines="4"] { color: #0a58ca; } /* dark blue */
-.hexagon[data-mines="5"] { color: #6f42c1; } /* purple */
-.hexagon[data-mines="6"] { color: #fd7e14; } /* orange */
+@keyframes pulse-flag {
+    0% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+}
+
 
 /* Message Overlay Styles */
 #message-overlay {
@@ -129,13 +152,13 @@ h1 {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.6);
     color: white;
     display: flex;
     justify-content: center;
     align-items: center;
     text-align: center;
-    z-index: 10;
+    z-index: 1001; /* Must be on top of everything */
     border-radius: 10px;
 }
 
@@ -145,4 +168,5 @@ h1 {
     padding: 20px;
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 10px;
+    text-shadow: 0 0 10px #fff;
 }
