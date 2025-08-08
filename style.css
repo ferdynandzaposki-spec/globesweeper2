@@ -1,0 +1,134 @@
+/* Basic page styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #f0f2f5;
+    color: #333;
+    margin: 0;
+    padding-top: 20px;
+}
+
+h1 {
+    color: #1a1a1a;
+}
+
+/* Game info bar styles */
+#game-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 90%;
+    max-width: 500px;
+    margin-bottom: 20px;
+    background: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#reset-button {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    background-color: #007bff;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#reset-button:hover {
+    background-color: #0056b3;
+}
+
+#mine-counter, #timer {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* Game board container */
+#game-board {
+    position: relative;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    border-radius: 10px;
+    background: #ddd;
+    padding: 10px;
+}
+
+/* Hexagon styles */
+.hexagon {
+    position: absolute;
+    width: 40px;
+    height: 46.19px; /* width * sqrt(3) / 2 * 1.1547 */
+    background-color: #888;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 20px;
+    font-weight: bold;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.hexagon:hover {
+    background-color: #999;
+}
+
+.hexagon.revealed {
+    background-color: #ccc;
+    cursor: default;
+}
+
+.hexagon.revealed:hover {
+    background-color: #ccc;
+}
+
+.hexagon.mine {
+    background-color: #dc3545; /* red */
+}
+
+.hexagon.mine::after {
+    content: '💣';
+    font-size: 20px;
+}
+
+.hexagon.flagged::after {
+    content: '🚩';
+    font-size: 18px;
+}
+
+/* Number colors */
+.hexagon[data-mines="1"] { color: #0d6efd; } /* blue */
+.hexagon[data-mines="2"] { color: #198754; } /* green */
+.hexagon[data-mines="3"] { color: #dc3545; } /* red */
+.hexagon[data-mines="4"] { color: #0a58ca; } /* dark blue */
+.hexagon[data-mines="5"] { color: #6f42c1; } /* purple */
+.hexagon[data-mines="6"] { color: #fd7e14; } /* orange */
+
+/* Message Overlay Styles */
+#message-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    z-index: 10;
+    border-radius: 10px;
+}
+
+#message-text {
+    font-size: 2em;
+    font-weight: bold;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+}
