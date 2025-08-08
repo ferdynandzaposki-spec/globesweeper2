@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Game State & Element Cache
     let grid = [];
-    let hexagonElements = []; // Cache for fisheye effect
+    let hexagonElements = [];
     let gameOver = false;
     let minesPlaced = false;
     let revealedCells = 0;
@@ -46,13 +46,14 @@ document.addEventListener('DOMContentLoaded', () => {
         createDataGrid();
         createVisualGrid();
 
+        // Add all event listeners for a new game
         gameBoard.addEventListener('click', handleLeftClick);
         gameBoard.addEventListener('contextmenu', handleRightClick);
+        gameBoard.addEventListener('dblclick', handleDoubleClick);
 
-        // Center the view on start
         gameViewport.scrollLeft = (gameBoard.scrollWidth - gameViewport.clientWidth) / 2;
         gameViewport.scrollTop = (gameBoard.scrollHeight - gameViewport.clientHeight) / 2;
-        applyFisheyeEffect(); // Initial effect
+        applyFisheyeEffect();
     }
 
     function createDataGrid() {
@@ -66,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createVisualGrid() {
         gameBoard.innerHTML = '';
-        hexagonElements = []; // Clear cache
+        hexagonElements = [];
         const hexHorizontalSpacing = HEX_WIDTH * 0.75;
         const hexVerticalSpacing = HEX_HEIGHT;
 
@@ -76,14 +77,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 hexagon.classList.add('hexagon');
                 hexagon.dataset.row = row;
                 hexagon.dataset.col = col;
-
                 const x = col * hexHorizontalSpacing;
                 const y = row * hexVerticalSpacing + (col % 2 === 1 ? hexVerticalSpacing / 2 : 0);
-
                 hexagon.style.left = `${x}px`;
                 hexagon.style.top = `${y}px`;
                 gameBoard.appendChild(hexagon);
-                hexagonElements.push(hexagon); // Cache the element
+                hexagonElements.push(hexagon);
             }
         }
         gameBoard.appendChild(messageOverlay);
@@ -98,28 +97,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const viewportRect = gameViewport.getBoundingClientRect();
         const centerX = gameViewport.scrollLeft + viewportRect.width / 2;
         const centerY = gameViewport.scrollTop + viewportRect.height / 2;
-
         const radius = viewportRect.width / 2;
-        const distortion = 0.5; // Adjust this value for more/less distortion
 
         for (const hexagon of hexagonElements) {
             const hexRect = hexagon.getBoundingClientRect();
             const hexX = parseFloat(hexagon.style.left) + hexRect.width / 2;
             const hexY = parseFloat(hexagon.style.top) + hexRect.height / 2;
-
             const dx = hexX - centerX;
             const dy = hexY - centerY;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < radius) {
                 const normalizedDist = distance / radius;
-                const scale = (Math.cos(normalizedDist * Math.PI / 2) + 1) / 1.5; // Smooth curve, peaks at center
-
-                // Pull hexagons towards the center
+                const scale = (Math.cos(normalizedDist * Math.PI / 2) + 1) / 1.5;
                 const pullFactor = 0.4 * (1 - scale);
                 const tx = -dx * pullFactor;
                 const ty = -dy * pullFactor;
-
                 hexagon.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
                 hexagon.style.zIndex = Math.floor(100 * scale);
             } else {
@@ -128,8 +121,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
-
-    // --- Event Handlers and Game Logic (largely unchanged) ---
 
     function placeMines(clickedRow, clickedCol) {
         const allCells = [];
@@ -169,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleRightClick(e) {
         e.preventDefault();
+        if (hasDragged) return;
         const hexagon = e.target.closest('.hexagon');
         if (gameOver || !hexagon) return;
         const row = parseInt(hexagon.dataset.row); const col = parseInt(hexagon.dataset.col);
@@ -180,6 +172,32 @@ document.addEventListener('DOMContentLoaded', () => {
         updateMineCounter();
     }
 
+    function handleDoubleClick(e) {
+        if (hasDragged || gameOver) return;
+        const hexagon = e.target.closest('.hexagon');
+        if (!hexagon) return;
+
+        const row = parseInt(hexagon.dataset.row);
+        const col = parseInt(hexagon.dataset.col);
+        const cell = grid[row][col];
+
+        // Chording only works on revealed cells with a number
+        if (!cell.isRevealed || cell.adjacentMines === 0) return;
+
+        const neighbors = getNeighbors(row, col);
+        const flaggedNeighbors = neighbors.filter(n => grid[n.row][n.col].isFlagged).length;
+
+        // If flagged neighbors match the cell's number, reveal other non-flagged neighbors
+        if (flaggedNeighbors === cell.adjacentMines) {
+            neighbors.forEach(n => {
+                if (!grid[n.row][n.col].isRevealed && !grid[n.row][n.col].isFlagged) {
+                    revealCell(n.row, n.col);
+                }
+            });
+            checkWinCondition();
+        }
+    }
+
     function revealCell(row, col) {
         const cell = grid[row][col];
         if (!cell || cell.isRevealed || cell.isFlagged) return;
@@ -187,8 +205,12 @@ document.addEventListener('DOMContentLoaded', () => {
         revealedCells++;
         const hexagon = document.querySelector(`[data-row='${row}'][data-col='${col}']`);
         hexagon.classList.add('revealed');
-        if (cell.adjacentMines > 0) { hexagon.textContent = cell.adjacentMines; hexagon.dataset.mines = cell.adjacentMines; }
-        else { getNeighbors(row, col).forEach(n => revealCell(n.row, n.col)); }
+        if (cell.adjacentMines > 0) {
+            hexagon.innerHTML = `<span class="hex-number">${cell.adjacentMines}</span>`;
+            hexagon.dataset.mines = cell.adjacentMines;
+        } else {
+            getNeighbors(row, col).forEach(n => revealCell(n.row, n.col));
+        }
     }
 
     function endGame(isWin) {
@@ -196,6 +218,10 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(timerInterval);
         messageText.textContent = isWin ? 'Congratulations, you won!' : 'Game Over!';
         messageOverlay.style.display = 'flex';
+        // Remove listeners to prevent further interaction
+        gameBoard.removeEventListener('click', handleLeftClick);
+        gameBoard.removeEventListener('contextmenu', handleRightClick);
+        gameBoard.removeEventListener('dblclick', handleDoubleClick);
         if (!isWin) {
             grid.forEach((row, r) => {
                 row.forEach((cell, c) => {
@@ -216,10 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners ---
-    gameViewport.addEventListener('scroll', () => {
-        requestAnimationFrame(applyFisheyeEffect);
-    });
-
+    gameViewport.addEventListener('scroll', () => { requestAnimationFrame(applyFisheyeEffect); });
     gameViewport.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
         isDragging = true;
@@ -230,7 +253,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollLeftStart = gameViewport.scrollLeft;
         scrollTopStart = gameViewport.scrollTop;
     });
-
     gameViewport.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
         e.preventDefault();
@@ -242,11 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameViewport.scrollLeft = scrollLeftStart - walkX;
         gameViewport.scrollTop = scrollTopStart - walkY;
     });
-
-    const stopDragging = () => {
-        isDragging = false;
-        gameViewport.style.cursor = 'grab';
-    };
+    const stopDragging = () => { isDragging = false; gameViewport.style.cursor = 'grab'; };
     gameViewport.addEventListener('mouseup', stopDragging);
     gameViewport.addEventListener('mouseleave', stopDragging);
 
